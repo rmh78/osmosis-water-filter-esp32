@@ -19,6 +19,7 @@ TDSMeter tds = TDSMeter(36);
 
 void measureScale();
 void measureTDS();
+void waterPeriodicFlush();
 void waterFlushPhase1();
 void waterFlushPhase2();
 void waterFlushPhase2Finished();
@@ -29,24 +30,9 @@ void updateDisplay();
 
 StopWatch sw(StopWatch::SECONDS);
 
-const int WATER_START_DELAY = 5 * TASK_SECOND;
-const int WATER_TIMEOUT = 5 * TASK_MINUTE;
-/*
-const int FLUSH_PHASE1_DURATION = 30 * TASK_SECOND;
-const int FLUSH_PHASE2_DURATION = 2 * TASK_MINUTE;
-const int FLUSH_PHASE3_DURATION = 30 * TASK_SECOND;
-*/
-const int FLUSH_PHASE1_DURATION = 5 * TASK_SECOND;
-const int FLUSH_PHASE2_DURATION = 10 * TASK_SECOND;
-const int FLUSH_PHASE3_DURATION = 15 * TASK_SECOND;
-
-
-const int SCALE_INTERVAL = 500 * TASK_MILLISECOND;
-const int TDS_INTERVAL = 5 * TASK_SECOND;
-const int DISPLAY_INTERVAL = 500 * TASK_MILLISECOND;
-
 Scheduler taskManager;
 Task taskWater(WATER_START_DELAY, TASK_FOREVER);
+Task taskPeriodicFlush(PERIODIC_FLUSH_INTERVAL, TASK_FOREVER, &waterPeriodicFlush);
 Task taskScale(SCALE_INTERVAL, TASK_FOREVER, &measureScale);
 Task taskTDS(TDS_INTERVAL, TASK_FOREVER, &measureTDS);
 Task taskDisplay(DISPLAY_INTERVAL, TASK_FOREVER, &updateDisplay);
@@ -60,6 +46,7 @@ void setup()
   taskManager.addTask(taskScale);
   taskManager.addTask(taskTDS);
   taskManager.addTask(taskWater);
+  taskManager.addTask(taskPeriodicFlush);
   taskManager.addTask(taskDisplay);
 
   tds.init();
@@ -69,6 +56,7 @@ void setup()
   taskScale.enable();
   taskDisplay.enable();
   taskTDS.enable();
+  taskPeriodicFlush.enableDelayed();
 }
 
 void loop()
@@ -124,6 +112,16 @@ void measureTDS()
   model.ppm = tds.readValue();
 }
 
+void waterPeriodicFlush()
+{
+  if (model.isFlushTime() && model.getEvent() == Event::FilterOff)
+  {
+    Task* task = taskManager.getCurrentTask();
+    task->setCallback(&waterFlushPhase1);
+    task->forceNextIteration();
+  }
+}
+
 void waterFlushPhase1()
 {
   sw.stop();
@@ -132,8 +130,10 @@ void waterFlushPhase1()
 
   model.setEvent(Event::FlushPhase1);
   relayModule.flushMembrane();
-  taskWater.setCallback(&waterFlushPhase2);
-  taskWater.delay(FLUSH_PHASE1_DURATION);
+
+  Task* task = taskManager.getCurrentTask();
+  task->setCallback(&waterFlushPhase2);
+  task->delay(FLUSH_PHASE1_DURATION);
 }
 
 void waterFlushPhase2()
@@ -144,15 +144,29 @@ void waterFlushPhase2()
 
   model.setEvent(Event::FlushPhase2);
   relayModule.flushStandingWater();
-  taskWater.setCallback(&waterFlushPhase2Finished);
-  taskWater.delay(FLUSH_PHASE2_DURATION);
+
+  Task* task = taskManager.getCurrentTask();
+  task->setCallback(&waterFlushPhase2Finished);
+  task->delay(FLUSH_PHASE2_DURATION);
 }
 
 void waterFlushPhase2Finished()
 {
   model.lastFlushTime = millis();
-  taskWater.setCallback(&waterFilterOn);
-  taskWater.forceNextIteration();
+
+  Task* task = taskManager.getCurrentTask();
+  if (task == &taskWater)
+  {
+    task->setCallback(&waterFilterOn);
+  
+    // update periodic flush interval
+    taskPeriodicFlush.setInterval(PERIODIC_FLUSH_INTERVAL);
+  }
+  else
+  {
+    task->setCallback(&waterFilterOff);
+  }
+  task->forceNextIteration();
 }
 
 void waterFlushPhase3()
@@ -163,8 +177,10 @@ void waterFlushPhase3()
 
   model.setEvent(Event::FlushPhase3);
   relayModule.flushMembrane();
-  taskWater.setCallback(&waterFilterOff);
-  taskWater.delay(FLUSH_PHASE3_DURATION);
+
+  Task* task = taskManager.getCurrentTask();
+  task->setCallback(&waterFilterOff);
+  task->delay(FLUSH_PHASE3_DURATION);
 }
 
 void waterFilterOn()
@@ -175,8 +191,10 @@ void waterFilterOn()
 
   model.setEvent(Event::FilterOn);
   relayModule.filterWater();
-  taskWater.setCallback(&waterFilterOff);
-  taskWater.delay(WATER_TIMEOUT);
+
+  Task* task = taskManager.getCurrentTask();
+  task->setCallback(&waterFilterOff);
+  task->delay(WATER_TIMEOUT);
 }
 
 void waterFilterOff() 
@@ -186,5 +204,10 @@ void waterFilterOff()
 
   model.setEvent(Event::FilterOff);
   relayModule.off();
-  taskWater.disable();
+
+  Task* task = taskManager.getCurrentTask();
+  if (task == &taskWater)
+  {
+    task->disable();
+  }
 }

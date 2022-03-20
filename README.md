@@ -14,7 +14,7 @@ This project contains the program controlling my osmotic water filter using an E
 - [x] Flush membrane and standing water before filtering water to prevent contamination.
 - [x] Flush membrane after filtering water to prevent membrane from calcification.
 - [x] Only flush when necessary by storing last flush time.
-- [ ] Flush membrane and standing water every 4 hours to prevent contamination.
+- [x] Flush membrane and standing water every 4 hours to prevent contamination.
 - [ ] Flush unlimited time for filter change.
 - [ ] Disinfection program (filter small time amount, rest for 15 minutes, repeat 10 times, flush membrane, filter water).
 - [ ] HTTP REST call to send event-status to backend.
