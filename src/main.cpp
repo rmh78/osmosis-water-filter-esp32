@@ -19,28 +19,34 @@ TDSMeter tds = TDSMeter(36);
 
 void measureScale();
 void measureTDS();
-void waterFlushMembrane();
-void waterFlushMembraneAfterFilter();
-void waterFlushStandingWater();
-void waterFlushFinished();
-void waterFilterStart();
-void waterFilterTimeout();
-void waterStop();
+void waterFlushPhase1();
+void waterFlushPhase2();
+void waterFlushPhase2Finished();
+void waterFlushPhase3();
+void waterFilterOn();
+void waterFilterOff();
 void updateDisplay();
 
 StopWatch sw(StopWatch::SECONDS);
 
 const int WATER_START_DELAY = 5 * TASK_SECOND;
 const int WATER_TIMEOUT = 5 * TASK_MINUTE;
-const int FLUSH_MEMBRANE_DURATION = 30 * TASK_SECOND;
-const int FLUSH_STANDING_WATER_DURATION = 2 * TASK_MINUTE;
+/*
+const int FLUSH_PHASE1_DURATION = 30 * TASK_SECOND;
+const int FLUSH_PHASE2_DURATION = 2 * TASK_MINUTE;
+const int FLUSH_PHASE3_DURATION = 30 * TASK_SECOND;
+*/
+const int FLUSH_PHASE1_DURATION = 5 * TASK_SECOND;
+const int FLUSH_PHASE2_DURATION = 10 * TASK_SECOND;
+const int FLUSH_PHASE3_DURATION = 15 * TASK_SECOND;
+
+
 const int SCALE_INTERVAL = 500 * TASK_MILLISECOND;
 const int TDS_INTERVAL = 5 * TASK_SECOND;
 const int DISPLAY_INTERVAL = 500 * TASK_MILLISECOND;
 
 Scheduler taskManager;
 Task taskWater(WATER_START_DELAY, TASK_FOREVER);
-Task taskFlushAfterFilter(WATER_START_DELAY, TASK_FOREVER, &waterFlushMembraneAfterFilter);
 Task taskScale(SCALE_INTERVAL, TASK_FOREVER, &measureScale);
 Task taskTDS(TDS_INTERVAL, TASK_FOREVER, &measureTDS);
 Task taskDisplay(DISPLAY_INTERVAL, TASK_FOREVER, &updateDisplay);
@@ -60,7 +66,6 @@ void setup()
   relayModule.init();
   waterScale.init();
 
-  taskWater.setOnDisable(&waterStop);
   taskScale.enable();
   taskDisplay.enable();
   taskTDS.enable();
@@ -88,26 +93,28 @@ void measureScale()
       sw.reset();
       sw.start();
 
-      model.event = "glass empty";
-      taskWater.setCallback(model.isFlushTime() ? &waterFlushMembrane : &waterFilterStart);
+      model.setEvent(Event::GlassEmpty);
+      taskWater.setCallback(model.isFlushTime() ? &waterFlushPhase1 : &waterFilterOn);
       taskWater.enableDelayed();
     }
   }
   else if (model.isGlassFull())
   {
-    if (taskWater.isEnabled())
+    if (taskWater.isEnabled() && model.getEvent() == Event::FilterOn)
     {
-      model.event = "glass full";
-      taskWater.cancel();
-      taskFlushAfterFilter.enable();
+      model.setEvent(Event::GlassFull);
+      taskWater.setCallback(&waterFlushPhase3);
+      taskWater.forceNextIteration();
     }
   }
   else if (model.isGlassGone())
   {
+    model.setEvent(Event::GlassGone);
+
     if (taskWater.isEnabled())
     {
-      model.event = "glass gone";
-      taskWater.cancel();
+      taskWater.setCallback(&waterFilterOff);
+      taskWater.forceNextIteration();
     }
   }
 }
@@ -117,64 +124,67 @@ void measureTDS()
   model.ppm = tds.readValue();
 }
 
-void waterFlushMembrane()
+void waterFlushPhase1()
 {
   sw.stop();
   sw.reset();
   sw.start();
 
-  model.event = "flush membrane";
+  model.setEvent(Event::FlushPhase1);
   relayModule.flushMembrane();
-  taskWater.setCallback(&waterFlushStandingWater);
-  taskWater.delay(FLUSH_MEMBRANE_DURATION);
+  taskWater.setCallback(&waterFlushPhase2);
+  taskWater.delay(FLUSH_PHASE1_DURATION);
 }
 
-void waterFlushMembraneAfterFilter()
-{
-  model.event = "flush membrane";
-  relayModule.flushMembrane();
-  taskWater.setCallback(&waterStop);
-  taskWater.delay(FLUSH_MEMBRANE_DURATION);
-}
-
-void waterFlushStandingWater()
+void waterFlushPhase2()
 {
   sw.stop();
   sw.reset();
   sw.start();
 
-  model.event = "flush standing water";
+  model.setEvent(Event::FlushPhase2);
   relayModule.flushStandingWater();
-  taskWater.setCallback(&waterFlushFinished);
-  taskWater.delay(FLUSH_STANDING_WATER_DURATION);
+  taskWater.setCallback(&waterFlushPhase2Finished);
+  taskWater.delay(FLUSH_PHASE2_DURATION);
 }
 
-void waterFlushFinished()
+void waterFlushPhase2Finished()
 {
   model.lastFlushTime = millis();
-  taskWater.setCallback(&waterFilterStart);
+  taskWater.setCallback(&waterFilterOn);
   taskWater.forceNextIteration();
 }
 
-void waterFilterStart()
+void waterFlushPhase3()
 {
   sw.stop();
   sw.reset();
   sw.start();
 
-  model.event = "filter run";
+  model.setEvent(Event::FlushPhase3);
+  relayModule.flushMembrane();
+  taskWater.setCallback(&waterFilterOff);
+  taskWater.delay(FLUSH_PHASE3_DURATION);
+}
+
+void waterFilterOn()
+{
+  sw.stop();
+  sw.reset();
+  sw.start();
+
+  model.setEvent(Event::FilterOn);
   relayModule.filterWater();
-  taskWater.setCallback(&waterFilterTimeout);
+  taskWater.setCallback(&waterFilterOff);
   taskWater.delay(WATER_TIMEOUT);
 }
 
-void waterFilterTimeout()
-{
-  taskWater.disable();
-}
-
-void waterStop() 
+void waterFilterOff() 
 {
   sw.stop();
+  sw.reset();
+
+  model.setEvent(Event::FilterOff);
   relayModule.off();
+  taskWater.disable();
 }

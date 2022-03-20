@@ -71,12 +71,13 @@ float TDSMeter::readValue()
 
             // convert voltage value to tds value
             tdsValue = (133.42 * compensationVoltage * compensationVoltage * compensationVoltage - 255.86 * compensationVoltage * compensationVoltage + 857.39 * compensationVoltage) * 0.5;
-            Serial.print("voltage:");
-            Serial.print(averageVoltage, 2);
-            Serial.print("V   ");
-            Serial.print("TDS----Value:");
-            Serial.print(tdsValue, 0);
-            Serial.println("ppm");
+            
+            //Serial.print("voltage:");
+            //Serial.print(averageVoltage, 2);
+            //Serial.print("V   ");
+            //Serial.print("TDS----Value:");
+            //Serial.print(tdsValue, 0);
+            //Serial.println("ppm");
 
             return tdsValue;
         }

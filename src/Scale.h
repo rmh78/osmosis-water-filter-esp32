@@ -82,8 +82,8 @@ float Scale::readWeight()
     scale.power_up();
     float result = scale.get_units(2);
 
-    Serial.print("read weight: ");
-    Serial.println(result, 1);
+    //Serial.print("read weight: ");
+    //Serial.println(result, 1);
 
     scale.power_down();
     return result;
