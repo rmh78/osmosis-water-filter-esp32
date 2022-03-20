@@ -16,7 +16,8 @@ This project contains the program controlling my osmotic water filter using an E
 - [x] Only flush when necessary by storing last flush time.
 - [x] Flush membrane and standing water every 4 hours to prevent contamination.
 - [ ] Flush unlimited time for filter change.
-- [ ] Disinfection program (filter small time amount, rest for 15 minutes, repeat 10 times, flush membrane, filter water).
+- [x] Disinfection program (filter small time amount, rest for 15 minutes, repeat 10 times, flush membrane, filter water).
+- [ ] Add button to trigger disinfection program.
 - [ ] HTTP REST call to send event-status to backend.
 
 ## Configuration

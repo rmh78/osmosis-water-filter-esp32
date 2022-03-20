@@ -8,7 +8,8 @@ enum class Event
     FlushPhase2 = 5,
     FlushPhase3 = 6,
     FilterOn = 7,
-    FilterOff = 8
+    FilterOff = 8,
+    Disinfection = 9
 };
 static const String EventNames[] = 
 {
@@ -20,7 +21,8 @@ static const String EventNames[] =
     "Flush phase 2", 
     "Flush phase 3", 
     "Filter on", 
-    "Filter off"
+    "Filter off",
+    "Disinfection"
 };
 
 const int WATER_START_DELAY = 5 * TASK_SECOND;
@@ -35,6 +37,10 @@ const int FLUSH_PHASE1_DURATION = 5 * TASK_SECOND;
 const int FLUSH_PHASE2_DURATION = 10 * TASK_SECOND;
 const int FLUSH_PHASE3_DURATION = 15 * TASK_SECOND;
 const int PERIODIC_FLUSH_INTERVAL = 2 * TASK_MINUTE;
+
+const int DISINFECTION_START_DELAY = 5 * TASK_SECOND;
+const int DISINFECTION_FILTER_DURATION = 5 * TASK_SECOND;
+const int DISINFECTION_WAIT_DURATION = 15 * TASK_MINUTE;
 
 const int SCALE_INTERVAL = 500 * TASK_MILLISECOND;
 const int TDS_INTERVAL = 5 * TASK_SECOND;
