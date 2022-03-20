@@ -213,6 +213,11 @@ void waterFilterOff()
   {
     task->disable();
   }
+  else if (task == &taskPeriodicFlush)
+  {
+    task->setCallback(&waterPeriodicFlush);
+    task->setInterval(PERIODIC_FLUSH_INTERVAL);
+  }
 }
 
 // TODO start on button press
