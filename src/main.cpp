@@ -9,6 +9,7 @@
 #include <Relays.h>
 #include <TDS.h>
 #include <UI.h>
+#include <OneButton.h>
 
 UI ui;
 DataModel model;
@@ -16,6 +17,8 @@ DataModel model;
 Scale waterScale = Scale(21, 22);
 Relays relayModule = Relays(27, 14, 12, 13);
 TDSMeter tds = TDSMeter(36);
+OneButton button1(2, true);
+OneButton button2(17, true);
 
 void measureScale();
 void measureTDS();
@@ -28,6 +31,7 @@ void waterFlushPhase3();
 void waterFilterOn();
 void waterFilterOff();
 void updateDisplay();
+void buttonTick();
 
 StopWatch sw(StopWatch::SECONDS);
 
@@ -39,10 +43,33 @@ Task taskScale(SCALE_INTERVAL, TASK_FOREVER, &measureScale);
 Task taskTDS(TDS_INTERVAL, TASK_FOREVER, &measureTDS);
 Task taskDisplay(DISPLAY_INTERVAL, TASK_FOREVER, &updateDisplay);
 
+TaskHandle_t TaskButton;
+
+void readButton( void * parameter )
+{
+  for(;;) 
+  {
+    // keep watching the push buttons:
+    button1.tick();
+    button2.tick();
+    delay(50);
+  }
+}
+
+void click1() {
+  Serial.println("Button 1 click.");
+}
+void click2() {
+  Serial.println("Button 2 click.");
+}
+
 void setup()
 {
   Serial.begin(115200);
   Heltec.begin(true /*DisplayEnable Enable*/, false /*LoRa Disable*/, true /*Serial Enable*/);
+
+  button1.attachClick(click1);
+  button2.attachClick(click2);
 
   taskManager.init();
   taskManager.addTask(taskScale);
@@ -60,6 +87,15 @@ void setup()
   taskScale.enable();
   taskTDS.enable();
   taskPeriodicFlush.enableDelayed();
+
+  xTaskCreatePinnedToCore(
+    readButton,   /* Task Function. */
+    "TaskButton", /* name of task. */
+    1000,         /* Stack size of task. */
+    NULL,         /* parameter of the task. */
+    1,            /* priority of the task. */
+    &TaskButton,  /* Task handel to keep track of created task. */
+    0);           /* choose Core */
 }
 
 void loop()
