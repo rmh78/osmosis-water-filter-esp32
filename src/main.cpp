@@ -1,25 +1,15 @@
 #define _TASK_STD_FUNCTION
 #define _TASK_THREAD_SAFE
 #include <TaskScheduler.h>
-
-#include <StopWatch.h>
 #include <Arduino.h>
-#include <heltec.h>
-#include <Scale.h>
-#include <Relays.h>
-#include <TDS.h>
-#include <UI.h>
 #include <OneButton.h>
+#include <heltec.h>
+#include <scale.h>
+#include <relays.h>
+#include <tds.h>
+#include <ui.h>
 
-UI ui;
-DataModel model;
-
-Scale waterScale = Scale(21, 22);
-Relays relayModule = Relays(27, 14, 12, 13);
-TDSMeter tds = TDSMeter(36);
-OneButton button1(2, true);
-OneButton button2(17, true);
-
+// function prototypes - begin
 void measureScale();
 void measureTDS();
 void waterPeriodicFlush();
@@ -31,9 +21,20 @@ void waterFlushPhase3();
 void waterFilterOn();
 void waterFilterOff();
 void updateDisplay();
-void buttonTick();
+void readButton(void *parameter);
+void modeNormal();
+void modeDisinfection();
+// function prototypes - end
 
-StopWatch sw(StopWatch::SECONDS);
+// initialize devices
+Scale waterScale = Scale(21, 22);
+Relays relayModule = Relays(27, 14, 12, 13);
+TDSMeter tds = TDSMeter(36);
+OneButton button1(2, true);
+OneButton button2(17, true);
+
+UI ui;
+DataModel model;
 
 Scheduler taskManager;
 Task taskWater(WATER_START_DELAY, TASK_FOREVER);
@@ -43,33 +44,13 @@ Task taskScale(SCALE_INTERVAL, TASK_FOREVER, &measureScale);
 Task taskTDS(TDS_INTERVAL, TASK_FOREVER, &measureTDS);
 Task taskDisplay(DISPLAY_INTERVAL, TASK_FOREVER, &updateDisplay);
 
-TaskHandle_t TaskButton;
-
-void readButton( void * parameter )
-{
-  for(;;) 
-  {
-    // keep watching the push buttons:
-    button1.tick();
-    button2.tick();
-    delay(50);
-  }
-}
-
-void click1() {
-  Serial.println("Button 1 click.");
-}
-void click2() {
-  Serial.println("Button 2 click.");
-}
+//TaskHandle_t TaskButton;
+bool buttonClicked = false;
 
 void setup()
 {
   Serial.begin(115200);
   Heltec.begin(true /*DisplayEnable Enable*/, false /*LoRa Disable*/, true /*Serial Enable*/);
-
-  button1.attachClick(click1);
-  button2.attachClick(click2);
 
   taskManager.init();
   taskManager.addTask(taskScale);
@@ -81,21 +62,30 @@ void setup()
 
   tds.init();
   relayModule.init();
-  waterScale.init();
+  //waterScale.init();
+  //waterScale.calibrate();
 
   taskDisplay.enable();
-  taskScale.enable();
-  taskTDS.enable();
-  taskPeriodicFlush.enableDelayed();
+  ui.drawModel(model);
 
-  xTaskCreatePinnedToCore(
-    readButton,   /* Task Function. */
-    "TaskButton", /* name of task. */
-    1000,         /* Stack size of task. */
-    NULL,         /* parameter of the task. */
-    1,            /* priority of the task. */
-    &TaskButton,  /* Task handel to keep track of created task. */
-    0);           /* choose Core */
+  button1.attachClick(modeNormal);
+  button2.attachClick(modeDisinfection);
+  while (buttonClicked == false)
+  {
+    // keep watching the buttons
+    button1.tick();
+    button2.tick();
+    delay(50);
+  }
+
+  // xTaskCreatePinnedToCore(
+  //   readButton,   /* Task Function. */
+  //   "TaskButton", /* name of task. */
+  //   1000,         /* Stack size of task. */
+  //   NULL,         /* parameter of the task. */
+  //   1,            /* priority of the task. */
+  //   &TaskButton,  /* Task handel to keep track of created task. */
+  //   0);           /* choose Core */
 }
 
 void loop()
@@ -103,10 +93,63 @@ void loop()
   taskManager.execute();
 }
 
-void updateDisplay() {
-  // TODO
-  model.timer = sw.elapsed();
-  ui.drawScale(model);
+// void readButton(void *parameter)
+// {
+//   for(;;) 
+//   {
+//     // keep watching the push buttons:
+//     button1.tick();
+//     button2.tick();
+//     delay(50);
+//   }
+// }
+
+// void disableAll()
+// {
+//   // disable tasks
+//   taskScale.disable();
+//   delay(500);
+//   taskWater.disable();
+//   taskTDS.disable();
+//   taskPeriodicFlush.disable();
+//   taskDisinfection.disable();
+
+//   relayModule.off();
+// }
+
+void modeNormal() 
+{
+  Serial.println("Button 1 clicked - Mode Normal");
+
+  //disableAll();
+
+  // start normal mode
+  waterScale.init();
+  model.setMode(Mode::Normal);
+  taskScale.enable();
+  taskPeriodicFlush.enableDelayed();
+
+  buttonClicked = true;
+}
+
+void modeDisinfection() 
+{
+  Serial.println("Button 2 click - Mode Disinfection");
+
+  //disableAll();
+
+  // start disinfection mode
+  model.setMode(Mode::Disinfection);
+  taskDisinfection.adjust(DISINFECTION_START_DELAY);
+  taskDisinfection.enableDelayed();
+
+  buttonClicked = true;
+}
+
+void updateDisplay() 
+{
+  model.nextFlushTime = taskManager.timeUntilNextIteration(taskPeriodicFlush) / 1000;
+  ui.drawModel(model);
 }
 
 void measureScale()
@@ -117,13 +160,16 @@ void measureScale()
   {
     if (!taskWater.isEnabled())
     {
-      sw.reset();
-      sw.start();
-
       model.setEvent(Event::GlassEmpty);
       taskWater.setCallback(model.isFlushTime() ? &waterFlushPhase1 : &waterFilterOn);
+      taskWater.adjust(WATER_START_DELAY);
       taskWater.enableDelayed();
     }
+  }
+  else if (model.isGlassAlmostFull() && model.getEvent() == Event::GlassEmpty)
+  {
+    model.setEvent(Event::GlassFull);
+    taskWater.disable();
   }
   else if (model.isGlassFull())
   {
@@ -155,118 +201,102 @@ void waterPeriodicFlush()
 {
   if (model.isFlushTime() && model.getEvent() == Event::FilterOff)
   {
-    Task* task = taskManager.getCurrentTask();
-    task->setCallback(&waterFlushPhase1);
-    task->forceNextIteration();
+    taskPeriodicFlush.setCallback(&waterFlushPhase1);
+    taskPeriodicFlush.forceNextIteration();
   }
 }
 
 void waterFlushPhase1()
 {
-  sw.stop();
-  sw.reset();
-  sw.start();
-
-  model.setEvent(Event::FlushPhase1);
   relayModule.flushMembrane();
+  model.setEvent(Event::FlushPhase1);
 
   Task* task = taskManager.getCurrentTask();
-  task->setCallback(&waterFlushPhase2);
-  task->delay(FLUSH_PHASE1_DURATION);
+  if (task->isEnabled() && (task == &taskWater || task == &taskPeriodicFlush))
+  {
+    task->setCallback(&waterFlushPhase2);
+    task->delay(FLUSH_PHASE1_DURATION);
+  }
 }
 
 void waterFlushPhase2()
 {
-  sw.stop();
-  sw.reset();
-  sw.start();
-
-  model.setEvent(Event::FlushPhase2);
   relayModule.flushStandingWater();
+  taskTDS.enable();
+  model.setEvent(Event::FlushPhase2);
 
   Task* task = taskManager.getCurrentTask();
-  task->setCallback(&waterFlushPhase2Finished);
-  task->delay(FLUSH_PHASE2_DURATION);
+  if (task->isEnabled() && (task == &taskWater || task == &taskPeriodicFlush))
+  {
+    task->setCallback(&waterFlushPhase2Finished);
+    task->delay(FLUSH_PHASE2_DURATION);
+  }
 }
 
 void waterFlushPhase2Finished()
 {
   model.lastFlushTime = millis();
+  taskTDS.disable();
 
   Task* task = taskManager.getCurrentTask();
-  if (task == &taskWater)
+  if (task->isEnabled()) 
   {
-    task->setCallback(&waterFilterOn);
-  
-    // update periodic flush interval
-    taskPeriodicFlush.setInterval(PERIODIC_FLUSH_INTERVAL);
+    if (task == &taskWater)
+    {
+      // update periodic flush interval
+      taskPeriodicFlush.setInterval(PERIODIC_FLUSH_INTERVAL);
+
+      taskWater.setCallback(&waterFilterOn);
+      taskWater.forceNextIteration();
+    }
+    else if (task == &taskPeriodicFlush)
+    {
+      taskPeriodicFlush.setCallback(&waterFilterOff);
+      taskPeriodicFlush.forceNextIteration();
+    }
   }
-  else
-  {
-    task->setCallback(&waterFilterOff);
-  }
-  task->forceNextIteration();
 }
 
 void waterFlushPhase3()
 {
-  sw.stop();
-  sw.reset();
-  sw.start();
-
-  model.setEvent(Event::FlushPhase3);
   relayModule.flushMembrane();
+  model.setEvent(Event::FlushPhase3);
 
-  Task* task = taskManager.getCurrentTask();
-  task->setCallback(&waterFilterOff);
-  task->delay(FLUSH_PHASE3_DURATION);
+  taskWater.setCallback(&waterFilterOff);
+  taskWater.delay(FLUSH_PHASE3_DURATION);
 }
 
 void waterFilterOn()
 {
-  sw.stop();
-  sw.reset();
-  sw.start();
-
-  model.setEvent(Event::FilterOn);
   relayModule.filterWater();
+  model.setEvent(Event::FilterOn);
 
-  Task* task = taskManager.getCurrentTask();
-  task->setCallback(&waterFilterOff);
-  task->delay(WATER_TIMEOUT);
+  taskWater.setCallback(&waterFilterOff);
+  taskWater.delay(WATER_TIMEOUT);
 }
 
 void waterFilterOff() 
 {
-  sw.stop();
-  sw.reset();
-
-  model.setEvent(Event::FilterOff);
   relayModule.off();
+  model.setEvent(Event::FilterOff);
 
   Task* task = taskManager.getCurrentTask();
   if (task == &taskWater)
   {
-    task->disable();
+    taskWater.disable();
   }
   else if (task == &taskPeriodicFlush)
   {
-    task->setCallback(&waterPeriodicFlush);
-    task->setInterval(PERIODIC_FLUSH_INTERVAL);
+    taskPeriodicFlush.setCallback(&waterPeriodicFlush);
+    taskPeriodicFlush.setInterval(PERIODIC_FLUSH_INTERVAL);
   }
-}
-
-// TODO start on button press
-void startDisinfection()
-{
-  taskDisinfection.enableDelayed();
 }
 
 void waterDisinfection()
 {
-  Task* task = taskManager.getCurrentTask();
-  long i = task->getRunCounter();
+  long i = taskDisinfection.getRunCounter();
   Serial.println("iteration: " + (String)i);
+  model.iteration = i;
 
   // filter small time amount -> wait for 15 minutes -> repeat 10 times
   if (i <= 20)
@@ -275,33 +305,33 @@ void waterDisinfection()
     {
       model.setEvent(Event::FilterOn);
       relayModule.filterWater();
-      task->delay(DISINFECTION_FILTER_DURATION);
+      taskDisinfection.delay(DISINFECTION_FILTER_DURATION);
     }
     else
     {
       model.setEvent(Event::FilterOff);
       relayModule.off();
-      task->delay(DISINFECTION_WAIT_DURATION);
+      taskDisinfection.delay(DISINFECTION_WAIT_DURATION);
     }
   }
   // finish with flush phase 1 & 2
-  else if (i == 16)
+  else if (i == 21)
   {
     model.setEvent(Event::FlushPhase1);
     relayModule.flushMembrane();
-    task->delay(FLUSH_PHASE1_DURATION);
+    taskDisinfection.delay(DISINFECTION_FLUSH_PHASE1_DURATION);
   }
-  else if (i == 17)
+  else if (i == 22)
   {
     model.setEvent(Event::FlushPhase2);
     relayModule.flushStandingWater();
-    task->delay(FLUSH_PHASE2_DURATION);
+    taskDisinfection.delay(DISINFECTION_FLUSH_PHASE2_DURATION);
   }
   // disinfection finished
   else
   {
-    model.setEvent(Event::FilterOff);
+    model.setEvent(Event::DisinfectionFinished);
     relayModule.off();
-    task->disable();
+    taskDisinfection.disable();
   }
 }

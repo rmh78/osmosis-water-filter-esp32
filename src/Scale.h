@@ -4,7 +4,8 @@ class Scale
 {
 	private:
         // the scale value obtained by the calibrate method
-        float SCALE_VALUE = 102.6f;
+        //float SCALE_VALUE = 102.6f; // small scale
+        float SCALE_VALUE = 236.46; // big scale
         int DOUT_PIN;
         int SCK_PIN;
 
@@ -51,9 +52,9 @@ float Scale::calibrate()
 
 void Scale::init()
 {
-    Serial.println("Initializing the scale");
-    scale.begin(DOUT_PIN, SCK_PIN);
+    Serial.println("Init the scale");
 
+    scale.begin(DOUT_PIN, SCK_PIN);
     // set the scale value (obtained by the calibrate method)
     scale.set_scale(SCALE_VALUE);
     // reset the scale to 0

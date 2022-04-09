@@ -15,10 +15,10 @@ class Relays
 
 Relays::Relays(int relay1Pin, int relay2Pin, int relay3Pin, int relay4Pin)
 {
-    PINS[0] = relay1Pin;
-    PINS[1] = relay2Pin;
-    PINS[2] = relay3Pin;
-    PINS[3] = relay4Pin;
+    PINS[0] = relay1Pin; // M1
+    PINS[1] = relay2Pin; // M2
+    PINS[2] = relay3Pin; // M3
+    PINS[3] = relay4Pin; // M4
 }
 
 void Relays::init()
@@ -43,12 +43,12 @@ void Relays::flushMembrane()
 
 void Relays::flushStandingWater()
 {
-    set(HIGH, LOW, HIGH, LOW);
+    set(LOW, HIGH, LOW, HIGH);
 }
 
 void Relays::filterWater()
 {
-    set(HIGH, LOW, LOW, HIGH);
+    set(LOW, HIGH, HIGH, LOW);
 }
 
 void Relays::off() 
