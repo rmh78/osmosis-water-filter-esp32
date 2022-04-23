@@ -53,7 +53,7 @@ const int SCALE_INTERVAL = 500 * TASK_MILLISECOND;
 const int TDS_INTERVAL = 5 * TASK_SECOND;
 const int DISPLAY_INTERVAL = 500 * TASK_MILLISECOND;
 
-const int GLASS_EMPTY_MIN_WEIGHT_GRAM = -20;
+const int GLASS_EMPTY_MIN_WEIGHT_GRAM = -50;
 const int GLASS_EMPTY_MAX_WEIGHT_GRAM = 800;
 const int GLASS_FULL_WEIGHT_GRAM = 1150;
 
@@ -70,13 +70,13 @@ struct FilterRun
 class DataModel
 {
 private:
-    Backend backend;
     FilterRun filterRun;
     Mode mode = Mode::Waiting;
     Event event = Event::Waiting;
     void sendDataToBackend();
 
 public:
+    Backend backend;
     int weight = 0;
     int ppm = 0;
     long lastFlushTime = 0;
@@ -187,13 +187,9 @@ String DataModel::getEventText()
 
 void DataModel::sendDataToBackend()
 {
-    if (backend.connectWiFi())
-    {
-        backend.createFilterEvent(
-            this->filterRun.startWeight,
-            this->filterRun.endWeight,
-            this->filterRun.duration,
-            this->filterRun.ppm);
-    }
-    backend.disconnectWiFi();
+    backend.createFilterEvent(
+        this->filterRun.startWeight,
+        this->filterRun.endWeight,
+        this->filterRun.duration,
+        this->filterRun.ppm);
 }

@@ -44,13 +44,17 @@ Task taskScale(SCALE_INTERVAL, TASK_FOREVER, &measureScale);
 Task taskTDS(TDS_INTERVAL, TASK_FOREVER, &measureTDS);
 Task taskDisplay(DISPLAY_INTERVAL, TASK_FOREVER, &updateDisplay);
 
-//TaskHandle_t TaskButton;
 bool buttonClicked = false;
 
 void setup()
 {
   Serial.begin(115200);
   Heltec.begin(true /*DisplayEnable Enable*/, false /*LoRa Disable*/, true /*Serial Enable*/);
+
+  relayModule.init();
+  
+  // init WiFi for backend
+  model.backend.init();
 
   taskManager.init();
   taskManager.addTask(taskScale);
@@ -61,9 +65,6 @@ void setup()
   taskManager.addTask(taskDisplay);
 
   tds.init();
-  relayModule.init();
-  //waterScale.init();
-  //waterScale.calibrate();
 
   taskDisplay.enable();
   ui.drawModel(model);
@@ -77,15 +78,6 @@ void setup()
     button2.tick();
     delay(50);
   }
-
-  // xTaskCreatePinnedToCore(
-  //   readButton,   /* Task Function. */
-  //   "TaskButton", /* name of task. */
-  //   1000,         /* Stack size of task. */
-  //   NULL,         /* parameter of the task. */
-  //   1,            /* priority of the task. */
-  //   &TaskButton,  /* Task handel to keep track of created task. */
-  //   0);           /* choose Core */
 }
 
 void loop()
@@ -93,37 +85,10 @@ void loop()
   taskManager.execute();
 }
 
-// void readButton(void *parameter)
-// {
-//   for(;;) 
-//   {
-//     // keep watching the push buttons:
-//     button1.tick();
-//     button2.tick();
-//     delay(50);
-//   }
-// }
-
-// void disableAll()
-// {
-//   // disable tasks
-//   taskScale.disable();
-//   delay(500);
-//   taskWater.disable();
-//   taskTDS.disable();
-//   taskPeriodicFlush.disable();
-//   taskDisinfection.disable();
-
-//   relayModule.off();
-// }
-
 void modeNormal() 
 {
   Serial.println("Button 1 clicked - Mode Normal");
 
-  //disableAll();
-
-  // start normal mode
   waterScale.init();
   model.setMode(Mode::Normal);
   taskScale.enable();
@@ -136,9 +101,6 @@ void modeDisinfection()
 {
   Serial.println("Button 2 click - Mode Disinfection");
 
-  //disableAll();
-
-  // start disinfection mode
   model.setMode(Mode::Disinfection);
   taskDisinfection.adjust(DISINFECTION_START_DELAY);
   taskDisinfection.enableDelayed();

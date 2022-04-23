@@ -26,6 +26,7 @@ void Relays::init()
     for (int i = 0; i < 4; i++) {
         pinMode(PINS[i], OUTPUT);
     }
+    this->off();
 }
 
 void Relays::set(byte relay1, byte relay2, byte relay3, byte relay4)
