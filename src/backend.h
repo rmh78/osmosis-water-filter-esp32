@@ -41,6 +41,7 @@ void handleWiFiEvent(WiFiEvent_t event, WiFiEventInfo_t info)
 class Backend
 {
 private:
+    bool disabled = true;
     String restService = "http://ubuntu-pi4:8081/filter-events/";
 
 public:
@@ -52,6 +53,11 @@ public:
 
 void Backend::init()
 {
+    if (disabled) {
+        Serial.println("### backend disabled - no WiFi communication");
+        return;
+    }
+
     Serial.println("### connecting to WiFi..");
 
     wifiReconnectTimer = xTimerCreate("wifiTimer", pdMS_TO_TICKS(10000), pdFALSE, (void *)0, reinterpret_cast<TimerCallbackFunction_t>(connectToWifi));
@@ -70,6 +76,10 @@ void Backend::init()
 
 void Backend::createFilterEvent(int startWeight, int endWeight, int duration, int ppm)
 {
+    if (disabled) {
+        return;
+    }
+
     Serial.println("### create filter event");
 
     HTTPClient http;
@@ -100,6 +110,10 @@ void Backend::createFilterEvent(int startWeight, int endWeight, int duration, in
 
 void Backend::getFilterEvent(long id)
 {
+    if (disabled) {
+        return;
+    }
+
     Serial.println("### get filter event for id: " + (String)id);
 
     HTTPClient http;
