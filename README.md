@@ -20,6 +20,10 @@ This project contains the program controlling my osmotic water filter using an E
 
 <img src="https://github.com/rmh78/osmosis-water-filter-esp32/assets/28454466/a85c56ce-077c-4368-91e6-4d0fd9aaec03" width="800"/>
 
+<img src="https://github.com/rmh78/osmosis-water-filter-esp32/assets/28454466/795140ad-6fbc-4879-9a73-3eb7211ca349" width="800"/>
+
+
+
 ## Components
 
 - Heltec WiFi LoRa 32 (V2)
