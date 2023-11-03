@@ -22,6 +22,13 @@ This project contains the program controlling my osmotic water filter using an E
 
 <img src="https://github.com/rmh78/osmosis-water-filter-esp32/assets/28454466/795140ad-6fbc-4879-9a73-3eb7211ca349" width="800"/>
 
+<br/>
+
+<img src="https://github.com/rmh78/osmosis-water-filter-esp32/assets/28454466/16824b0a-f303-46b3-ab3d-1b29961d2013" width="400"/>
+
+<img src="https://github.com/rmh78/osmosis-water-filter-esp32/assets/28454466/dab51afa-1b45-4f0d-a840-ff9fc813e5d4" width="400"/>
+
+<img src="https://github.com/rmh78/osmosis-water-filter-esp32/assets/28454466/8bac14c5-4791-43b9-836b-32f0ffd4fa74" width="800"/>
 
 
 ## Components
