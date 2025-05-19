@@ -42,6 +42,7 @@ const int FLUSH_PHASE1_DURATION = 30 * TASK_SECOND;
 const int FLUSH_PHASE2_DURATION = 2 * TASK_MINUTE;
 const int FLUSH_PHASE3_DURATION = 30 * TASK_SECOND;
 const int PERIODIC_FLUSH_INTERVAL = 2 * TASK_HOUR;
+const int FLUSH_DURATION = 5 * TASK_MINUTE;
 
 const int DISINFECTION_START_DELAY = 3 * TASK_SECOND;
 const int DISINFECTION_FILTER_DURATION = 5 * TASK_SECOND;
@@ -122,7 +123,7 @@ bool DataModel::isGlassGone()
 
 bool DataModel::isFlushTime()
 {
-    bool result = lastFlushTime == 0 || (lastFlushTime + PERIODIC_FLUSH_INTERVAL < millis());
+    bool result = lastFlushTime == 0 || (lastFlushTime + FLUSH_DURATION < millis());
     String flushText = result ? "Flush needed" : "Flush NOT needed";
     Serial.println((String)millis() + " - " + flushText);
     return result;
